@@ -2,6 +2,7 @@
   "name": "@okrapdf/vdom-plugins",
   "version": "0.1.0",
   "description": "VDOM Plugin System - Chrome Extension-like plugins for document analysis",
+  "private": true,
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -17,6 +18,10 @@
     "./plugins/orphan-detector": {
       "types": "./src/plugins/orphan-detector/index.ts",
       "import": "./src/plugins/orphan-detector/index.ts"
+    },
+    "./plugins/qwen-markdown": {
+      "types": "./src/plugins/qwen-markdown/index.ts",
+      "import": "./src/plugins/qwen-markdown/index.ts"
     }
   },
   "scripts": {
@@ -30,16 +35,6 @@
     "ocr",
     "pdf"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/okrapdf/vdom-plugins.git"
-  },
-  "author": "OkraPDF",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/okrapdf/vdom-plugins/issues"
-  },
-  "homepage": "https://github.com/okrapdf/vdom-plugins#readme",
   "peerDependencies": {
     "react": ">=18.0.0"
   }

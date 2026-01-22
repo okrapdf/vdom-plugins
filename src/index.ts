@@ -41,12 +41,21 @@ export type {
   PluginManagerEvent,
   PluginManagerEventData,
   IPluginManager,
+  // Command types (Chrome contextMenus-inspired)
+  EntityContextType,
+  CommandOutputFormat,
+  CommandContext,
+  CommandResult,
+  PluginCommand,
+  ResolvedCommand,
 } from './types';
 
 export {
   VdomReadyState,
   isVdomPlugin,
   isPluginResult,
+  isPluginCommand,
+  isCommandResult,
   validatePluginConfig,
 } from './types';
 
@@ -71,13 +80,21 @@ export {
   type OrphanDetectorStats,
 } from './plugins/orphan-detector';
 
+export {
+  qwenMarkdownPlugin,
+  qwenMarkdownConfigSchema,
+  type QwenMarkdownConfig,
+} from './plugins/qwen-markdown';
+
 // =============================================================================
 // Plugin Registry - Default plugins array
 // =============================================================================
 import { orphanDetectorPlugin } from './plugins/orphan-detector';
+import { qwenMarkdownPlugin } from './plugins/qwen-markdown';
 import type { VdomPlugin } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const defaultPlugins: VdomPlugin<any>[] = [
   orphanDetectorPlugin,
+  qwenMarkdownPlugin,
 ];

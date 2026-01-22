@@ -1,6 +1,7 @@
 import type {
   VdomPlugin,
   VdomLifecycleEvent,
+  VdomNode,
   PluginContext,
   PluginResult,
   PluginManagerEvent,
@@ -8,6 +9,10 @@ import type {
   IPluginManager,
   PluginEmitType,
   PluginEmitData,
+  ResolvedCommand,
+  CommandContext,
+  CommandResult,
+  EntityContextType,
 } from './types';
 import { VdomReadyState, type VdomReadyStateValue } from './types';
 
@@ -217,6 +222,116 @@ export class VdomPluginManager implements IPluginManager {
     this.enabledPlugins.clear();
     this.pluginConfigs.clear();
     this.listeners.clear();
+  }
+
+  /**
+   * Get all commands applicable to a given entity.
+   * Filters by entity type, enabled state, and visibility.
+   */
+  getCommandsForEntity(entity: VdomNode): ResolvedCommand[] {
+    const commands: ResolvedCommand[] = [];
+
+    for (const pluginName of this.enabledPlugins) {
+      const plugin = this.plugins.get(pluginName);
+      if (!plugin?.commands) continue;
+
+      for (const cmd of plugin.commands) {
+        // Check context match - 'all' matches everything, or entity.type must be in contexts
+        const matchesContext =
+          cmd.contexts.includes('all') ||
+          cmd.contexts.includes(entity.type as EntityContextType);
+
+        if (!matchesContext) continue;
+
+        // Check enabled (can be boolean or function)
+        const isEnabled =
+          typeof cmd.enabled === 'function'
+            ? cmd.enabled(entity)
+            : cmd.enabled !== false;
+
+        if (!isEnabled) continue;
+
+        // Check visible (can be boolean or function)
+        const isVisible =
+          typeof cmd.visible === 'function'
+            ? cmd.visible(entity)
+            : cmd.visible !== false;
+
+        if (!isVisible) continue;
+
+        commands.push({ ...cmd, pluginName });
+      }
+    }
+
+    return commands;
+  }
+
+  /**
+   * Execute a specific command from a plugin.
+   */
+  async executeCommand(
+    pluginName: string,
+    commandId: string,
+    context: Omit<CommandContext, 'config' | 'log'>
+  ): Promise<CommandResult> {
+    const plugin = this.plugins.get(pluginName);
+    if (!plugin) {
+      return { success: false, error: `Plugin "${pluginName}" not found` };
+    }
+
+    const command = plugin.commands?.find((c) => c.id === commandId);
+    if (!command) {
+      return { success: false, error: `Command "${commandId}" not found in plugin "${pluginName}"` };
+    }
+
+    if (!this.enabledPlugins.has(pluginName)) {
+      return { success: false, error: `Plugin "${pluginName}" is not enabled` };
+    }
+
+    this.emit('command:started', {
+      pluginName,
+      commandId,
+      entityId: context.entity.id,
+    });
+
+    const startTime = performance.now();
+
+    const fullContext: CommandContext = {
+      ...context,
+      config: this.pluginConfigs.get(pluginName) || {},
+      log: (level, message) => {
+        if (level === 'error') {
+          console.error(`[${pluginName}:${commandId}] ${message}`);
+        }
+      },
+    };
+
+    try {
+      const result = await command.handler(fullContext);
+      const duration = performance.now() - startTime;
+
+      this.emit('command:completed', {
+        pluginName,
+        commandId,
+        result,
+        duration,
+      });
+
+      return result;
+    } catch (error) {
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+
+      this.emit('command:error', {
+        pluginName,
+        commandId,
+        error: errorObj,
+      });
+
+      return {
+        success: false,
+        error: errorObj.message,
+      };
+    }
   }
 }
 

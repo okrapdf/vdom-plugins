@@ -136,7 +136,7 @@ export interface Annotation {
   comment?: string;
 }
 
-export type PluginEmitType = 'overlays' | 'badges' | 'annotations' | 'stats' | 'error';
+export type PluginEmitType = 'overlays' | 'badges' | 'annotations' | 'stats' | 'error' | 'transformation';
 
 export interface PluginEmitData {
   overlays: EntityOverlay[];
@@ -144,6 +144,113 @@ export interface PluginEmitData {
   annotations: Annotation[];
   stats: Record<string, number | string>;
   error: { message: string; details?: unknown };
+  transformation: { nodeId: string; format: CommandOutputFormat; content: string };
+}
+
+// =============================================================================
+// Plugin Commands (Chrome contextMenus-inspired)
+// =============================================================================
+
+/**
+ * Entity context types for command filtering.
+ * Like Chrome's ContextType for contextMenus.
+ */
+export type EntityContextType =
+  | 'all'        // Any entity
+  | 'table'      // Tables only
+  | 'figure'     // Figures/images
+  | 'text'       // Text blocks
+  | 'selection'  // User text selection
+  | 'ocr-block'  // Raw OCR blocks
+  | 'header'     // Headers
+  | 'footer'     // Footers
+  | 'list';      // Lists
+
+/**
+ * Output format for transformation commands.
+ */
+export type CommandOutputFormat = 'markdown' | 'html' | 'json' | 'text';
+
+/**
+ * Context passed to command handler during execution.
+ */
+export interface CommandContext<TConfig = Record<string, unknown>> {
+  /** The selected entity/node */
+  entity: VdomNode;
+
+  /** Entity's image URL (for vision models) - populated by host */
+  imageUrl?: string;
+
+  /** Entity's bounding box */
+  bbox: BBox;
+
+  /** Page number (1-indexed) */
+  pageNumber: number;
+
+  /** Document ID */
+  documentId: string;
+
+  /** Plugin config */
+  config: TConfig;
+
+  /** Logging */
+  log: (level: 'debug' | 'info' | 'warn' | 'error', message: string) => void;
+}
+
+/**
+ * Result returned by command handler.
+ */
+export interface CommandResult {
+  success: boolean;
+  /** The transformed content */
+  content?: string;
+  /** Output format */
+  format?: CommandOutputFormat;
+  /** Error if failed */
+  error?: string;
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Command that appears in entity context menu (dropdown).
+ * Like Chrome's chrome.contextMenus.create() properties.
+ */
+export interface PluginCommand<TConfig = Record<string, unknown>> {
+  /** Unique command ID within plugin */
+  id: string;
+
+  /** Display text in dropdown. Use %s for entity title interpolation */
+  title: string;
+
+  /** Entity types this command appears for (like Chrome's ContextType) */
+  contexts: EntityContextType[];
+
+  /** Output format this command produces */
+  outputFormat: CommandOutputFormat;
+
+  /** Icon for dropdown (optional) - icon name or URL */
+  icon?: string;
+
+  /** Keyboard shortcut (optional) e.g., "Ctrl+M" */
+  shortcut?: string;
+
+  /** Whether command is enabled (can be static or dynamic) */
+  enabled?: boolean | ((entity: VdomNode) => boolean);
+
+  /** Whether command is visible (can be static or dynamic) */
+  visible?: boolean | ((entity: VdomNode) => boolean);
+
+  /** The handler - called when user clicks this command */
+  handler: (ctx: CommandContext<TConfig>) => Promise<CommandResult>;
+}
+
+/**
+ * Command with plugin name attached (used by manager).
+ */
+export interface ResolvedCommand<TConfig = Record<string, unknown>> extends PluginCommand<TConfig> {
+  /** Plugin that owns this command */
+  pluginName: string;
 }
 
 // =============================================================================
@@ -204,6 +311,7 @@ export interface VdomPlugin<TConfig = Record<string, unknown>> {
   version?: string;
   runsOn: VdomLifecycleEvent[];
   handler: (ctx: PluginContext<TConfig>) => PluginResult | Promise<PluginResult>;
+  commands?: PluginCommand<TConfig>[];
   configSchema?: PluginConfigSchema;
   viewControls?: ViewControlSchema[];
   defaultEnabled?: boolean;
@@ -224,7 +332,10 @@ export type PluginManagerEvent =
   | 'plugin:started'
   | 'plugin:completed'
   | 'plugin:error'
-  | 'lifecycle:emit';
+  | 'lifecycle:emit'
+  | 'command:started'
+  | 'command:completed'
+  | 'command:error';
 
 export interface PluginManagerEventData {
   'plugin:registered': { name: string };
@@ -236,6 +347,9 @@ export interface PluginManagerEventData {
   'plugin:completed': { name: string; result: PluginResult; duration: number };
   'plugin:error': { name: string; error: Error };
   'lifecycle:emit': { pluginName: string; type: PluginEmitType; data: unknown };
+  'command:started': { pluginName: string; commandId: string; entityId: string };
+  'command:completed': { pluginName: string; commandId: string; result: CommandResult; duration: number };
+  'command:error': { pluginName: string; commandId: string; error: Error };
 }
 
 export interface IPluginManager {
@@ -246,12 +360,19 @@ export interface IPluginManager {
   isEnabled(name: string): boolean;
   setConfig(name: string, config: Record<string, unknown>): void;
   getConfig(name: string): Record<string, unknown>;
+  getPlugin(name: string): VdomPlugin | undefined;
   getPlugins(): VdomPlugin[];
   getEnabledPlugins(): string[];
   runEvent(
     event: VdomLifecycleEvent,
     context: Omit<PluginContext, 'event' | 'config' | 'emit' | 'log'>
   ): Promise<Map<string, PluginResult>>;
+  getCommandsForEntity(entity: VdomNode): ResolvedCommand[];
+  executeCommand(
+    pluginName: string,
+    commandId: string,
+    context: Omit<CommandContext, 'config' | 'log'>
+  ): Promise<CommandResult>;
   on<E extends PluginManagerEvent>(
     event: E,
     handler: (data: PluginManagerEventData[E]) => void
@@ -275,6 +396,23 @@ export function isVdomPlugin(value: unknown): value is VdomPlugin {
 }
 
 export function isPluginResult(value: unknown): value is PluginResult {
+  if (typeof value !== 'object' || value === null) return false;
+  return typeof (value as Record<string, unknown>).success === 'boolean';
+}
+
+export function isPluginCommand(value: unknown): value is PluginCommand {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.id === 'string' &&
+    typeof obj.title === 'string' &&
+    Array.isArray(obj.contexts) &&
+    typeof obj.outputFormat === 'string' &&
+    typeof obj.handler === 'function'
+  );
+}
+
+export function isCommandResult(value: unknown): value is CommandResult {
   if (typeof value !== 'object' || value === null) return false;
   return typeof (value as Record<string, unknown>).success === 'boolean';
 }
