@@ -393,5 +393,24 @@ describe('VdomPluginManager - Commands', () => {
         expect(commands.length > 0).toBe(shouldMatch);
       }
     );
+
+    it('ocr-block type matches ocr-block context (regression: inspector dropdown)', () => {
+      const ocrClassifierCmd = createMockCommand({
+        id: 'mark-as-paragraph',
+        title: 'Mark as Paragraph',
+        contexts: ['ocr-block'],
+      });
+      const plugin = createMockPlugin({
+        name: 'ocr-classifier',
+        commands: [ocrClassifierCmd],
+      });
+      manager.register(plugin);
+
+      const correctNode = createMockNode({ type: 'ocr-block' });
+      expect(manager.getCommandsForEntity(correctNode)).toHaveLength(1);
+
+      const wrongTypeNode = createMockNode({ type: 'ocr' });
+      expect(manager.getCommandsForEntity(wrongTypeNode)).toHaveLength(0);
+    });
   });
 });

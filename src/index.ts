@@ -9,39 +9,30 @@
 // Types - Plugin API surface
 // =============================================================================
 export type {
-  // Bounding boxes
   BBox,
   NormalizedBBox,
-  // Lifecycle
   VdomLifecycleEvent,
   VdomReadyStateValue,
-  // Plugin nodes
+  EntityType,
   VdomNode,
-  // Config schema
   ConfigFieldType,
   ConfigField,
   PluginConfigSchema,
-  // View controls (Chrome action API equivalent)
   ViewControlType,
   ViewControlSchema,
-  // Emit types
   EntityOverlay,
   NodeBadge,
   Annotation,
   PluginEmitType,
   PluginEmitData,
-  // Context & Result
   QueryEngine,
   EmitFunction,
   PluginContext,
   PluginResult,
-  // Plugin interface
   VdomPlugin,
-  // Manager types
   PluginManagerEvent,
   PluginManagerEventData,
   IPluginManager,
-  // Command types (Chrome contextMenus-inspired)
   EntityContextType,
   CommandOutputFormat,
   CommandContext,
@@ -86,15 +77,35 @@ export {
   type QwenMarkdownConfig,
 } from './plugins/qwen-markdown';
 
+export {
+  ocrClassifierPlugin,
+  ocrClassifierConfigSchema,
+  type OcrClassifierConfig,
+  type EntityCreationPayload,
+} from './plugins/ocr-classifier';
+
+export {
+  coordTableDetectorPlugin,
+  coordTableDetectorConfigSchema,
+  coordTableDetectorViewControls,
+  type CoordTableDetectorConfig,
+  type CoordTableDetectorStats,
+  type DetectedTable,
+} from './plugins/coord-table-detector';
+
 // =============================================================================
 // Plugin Registry - Default plugins array
 // =============================================================================
 import { orphanDetectorPlugin } from './plugins/orphan-detector';
 import { qwenMarkdownPlugin } from './plugins/qwen-markdown';
+import { ocrClassifierPlugin } from './plugins/ocr-classifier';
+import { coordTableDetectorPlugin } from './plugins/coord-table-detector';
 import type { VdomPlugin } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const defaultPlugins: VdomPlugin<any>[] = [
   orphanDetectorPlugin,
   qwenMarkdownPlugin,
+  ocrClassifierPlugin,
+  coordTableDetectorPlugin,
 ];

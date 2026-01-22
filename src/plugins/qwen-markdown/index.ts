@@ -3,6 +3,7 @@ import type {
   PluginCommand,
   CommandContext,
   CommandResult,
+  EntityType,
 } from '../../types';
 import { type QwenMarkdownConfig, qwenMarkdownConfigSchema } from './types';
 
@@ -12,7 +13,8 @@ export type { QwenMarkdownConfig };
 async function callTransformApi(
   imageUrl: string,
   config: QwenMarkdownConfig,
-  promptStyle: 'table' | 'page' | 'json'
+  promptStyle: 'table' | 'page' | 'json',
+  entityType: EntityType | string
 ): Promise<CommandResult> {
   try {
     const response = await fetch(config.apiEndpoint, {
@@ -22,7 +24,7 @@ async function callTransformApi(
         imageUrl,
         model: config.model,
         promptStyle,
-        entityType: 'all',
+        entityType,
       }),
     });
 
@@ -49,18 +51,32 @@ async function callTransformApi(
   }
 }
 
+function entityTypeToPromptStyle(entityType: EntityType | string): 'table' | 'page' | 'json' {
+  switch (entityType) {
+    case 'table':
+      return 'table';
+    case 'page':
+    case 'document':
+      return 'page';
+    default:
+      return 'page';
+  }
+}
+
 const extractMarkdownCommand: PluginCommand<QwenMarkdownConfig> = {
   id: 'extract-markdown',
   title: 'Extract as Markdown',
-  contexts: ['table', 'figure', 'all'],
+  contexts: ['table', 'figure', 'ocr-block', 'all'],
   outputFormat: 'markdown',
+  dataGetter: 'markdown',
   icon: 'file-text',
   shortcut: 'Ctrl+M',
   async handler(ctx: CommandContext<QwenMarkdownConfig>): Promise<CommandResult> {
     if (!ctx.imageUrl) {
       return { success: false, error: 'No image URL provided' };
     }
-    return callTransformApi(ctx.imageUrl, ctx.config, 'table');
+    const promptStyle = entityTypeToPromptStyle(ctx.entity.type);
+    return callTransformApi(ctx.imageUrl, ctx.config, promptStyle, ctx.entity.type);
   },
 };
 
@@ -69,12 +85,13 @@ const extractPageMarkdownCommand: PluginCommand<QwenMarkdownConfig> = {
   title: 'Extract Full Page',
   contexts: ['all'],
   outputFormat: 'markdown',
+  dataGetter: 'pageMarkdown',
   icon: 'file',
   async handler(ctx: CommandContext<QwenMarkdownConfig>): Promise<CommandResult> {
     if (!ctx.imageUrl) {
       return { success: false, error: 'No image URL provided' };
     }
-    return callTransformApi(ctx.imageUrl, ctx.config, 'page');
+    return callTransformApi(ctx.imageUrl, ctx.config, 'page', ctx.entity.type);
   },
 };
 
@@ -83,12 +100,13 @@ const extractJsonCommand: PluginCommand<QwenMarkdownConfig> = {
   title: 'Extract as JSON',
   contexts: ['table'],
   outputFormat: 'json',
+  dataGetter: 'json',
   icon: 'braces',
   async handler(ctx: CommandContext<QwenMarkdownConfig>): Promise<CommandResult> {
     if (!ctx.imageUrl) {
       return { success: false, error: 'No image URL provided' };
     }
-    return callTransformApi(ctx.imageUrl, ctx.config, 'json');
+    return callTransformApi(ctx.imageUrl, ctx.config, 'json', ctx.entity.type);
   },
 };
 

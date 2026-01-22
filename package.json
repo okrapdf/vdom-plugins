@@ -2,31 +2,49 @@
   "name": "@okrapdf/vdom-plugins",
   "version": "0.1.0",
   "description": "VDOM Plugin System - Chrome Extension-like plugins for document analysis",
-  "private": true,
+  "license": "MIT",
+  "author": "OkraPDF <support@okrapdf.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/okrapdf/vdom-plugins.git"
+  },
+  "homepage": "https://github.com/okrapdf/vdom-plugins#readme",
+  "bugs": "https://github.com/okrapdf/vdom-plugins/issues",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./runtime": {
-      "types": "./src/runtime.ts",
-      "import": "./src/runtime.ts"
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
     },
     "./plugins/orphan-detector": {
-      "types": "./src/plugins/orphan-detector/index.ts",
-      "import": "./src/plugins/orphan-detector/index.ts"
+      "types": "./dist/plugins/orphan-detector/index.d.ts",
+      "import": "./dist/plugins/orphan-detector/index.js"
     },
     "./plugins/qwen-markdown": {
-      "types": "./src/plugins/qwen-markdown/index.ts",
-      "import": "./src/plugins/qwen-markdown/index.ts"
+      "types": "./dist/plugins/qwen-markdown/index.d.ts",
+      "import": "./dist/plugins/qwen-markdown/index.js"
+    },
+    "./plugins/coord-table-detector": {
+      "types": "./dist/plugins/coord-table-detector/index.d.ts",
+      "import": "./dist/plugins/coord-table-detector/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm run test"
   },
   "keywords": [
     "vdom",

@@ -47,19 +47,44 @@ export const VdomReadyState = {
 export type VdomReadyStateValue = typeof VdomReadyState[keyof typeof VdomReadyState];
 
 // =============================================================================
+// Entity Types (single source of truth - like Typebot's discriminated unions)
+// =============================================================================
+
+/**
+ * All valid entity/node types in the VDOM system.
+ * Used by both VdomNode.type and PluginCommand.contexts.
+ * Adding a new entity type? Add it here and TypeScript will guide you.
+ */
+export type EntityType =
+  | 'table'
+  | 'figure'
+  | 'text'
+  | 'ocr-block'
+  | 'header'
+  | 'footer'
+  | 'list'
+  | 'page'
+  | 'document'
+  | 'paragraph'
+  | 'heading'
+  | 'footnote'
+  | 'summary'
+  | 'signature'
+  | 'form';
+
+// =============================================================================
 // Plugin Node (minimal interface plugins operate on)
 // =============================================================================
 
 export interface VdomNode {
   id: string;
-  type: string;
+  type: EntityType | string; // EntityType preferred, string for extensibility
   bbox: BBox;
   pageNumber: number;
   textContent?: string | Promise<string>;
   _textContent?: string;
   classNames: string[];
   attributes: Record<string, unknown>;
-  // Optional extended properties (available in full VdomNode from app)
   parent?: VdomNode | null;
   children?: VdomNode[];
   metadata?: Record<string, unknown>;
@@ -152,19 +177,9 @@ export interface PluginEmitData {
 // =============================================================================
 
 /**
- * Entity context types for command filtering.
- * Like Chrome's ContextType for contextMenus.
+ * Context types for command filtering. Derived from EntityType + special contexts.
  */
-export type EntityContextType =
-  | 'all'        // Any entity
-  | 'table'      // Tables only
-  | 'figure'     // Figures/images
-  | 'text'       // Text blocks
-  | 'selection'  // User text selection
-  | 'ocr-block'  // Raw OCR blocks
-  | 'header'     // Headers
-  | 'footer'     // Footers
-  | 'list';      // Lists
+export type EntityContextType = EntityType | 'all' | 'selection';
 
 /**
  * Output format for transformation commands.
@@ -228,6 +243,9 @@ export interface PluginCommand<TConfig = Record<string, unknown>> {
 
   /** Output format this command produces */
   outputFormat: CommandOutputFormat;
+
+  /** Data getter name for node.data display (e.g., 'markdown' shows as markdown() in inspector) */
+  dataGetter?: string;
 
   /** Icon for dropdown (optional) - icon name or URL */
   icon?: string;
